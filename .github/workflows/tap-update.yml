@@ -9,14 +9,13 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout tap
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl jq xz-utils
-          brew install homebrew/brew/bump-formula-pr
+          sudo apt-get install -y curl jq xz-utils git
 
       - name: Get latest release
         id: release
@@ -27,31 +26,32 @@ jobs:
       - name: Compute SHA256 for all targets
         id: sha
         run: |
-          TARGETS=(
-            "osx-x64"
-            "osx-arm64"
-            "linux-x64"
-            "linux-arm64"
-          )
+          declare -A SHAS
+          TARGETS=("osx-x64" "osx-arm64" "linux-x64" "linux-arm64")
           for T in "${TARGETS[@]}"; do
             FILE="koncrete_${LATEST}_${T}-Koncrete-binary.tar.gz"
-            curl -L -o $FILE https://github.com/yourusername/Koncrete/releases/download/$LATEST/$FILE
-            SHA=$(shasum -a 256 $FILE | awk '{print $1}')
-            echo "$T=$SHA" >> $GITHUB_ENV
+            URL="https://github.com/yourusername/Koncrete/releases/download/${LATEST}/${FILE}"
+            curl -L -o "$FILE" "$URL"
+            SHAS[$T]=$(sha256sum "$FILE" | awk '{print $1}')
           done
+          # Export as GitHub env
+          echo "OSX_X64=${SHAS[osx-x64]}" >> $GITHUB_ENV
+          echo "OSX_ARM64=${SHAS[osx-arm64]}" >> $GITHUB_ENV
+          echo "LINUX_X64=${SHAS[linux-x64]}" >> $GITHUB_ENV
+          echo "LINUX_ARM64=${SHAS[linux-arm64]}" >> $GITHUB_ENV
 
       - name: Update formula
         run: |
           sed -i "s/version \".*\"/version \"$LATEST\"/" koncrete.rb
-          sed -i "s/126eef9ebe9865476128abb810d714dbc2575e9ac46dd27d4cb47219a9c7df60/${osx_x64}/" koncrete.rb
-          sed -i "s/40e682ee0a9564dbebbfac4cdc629a540b6c806e63f6f127e902ae562982ea31/${osx_arm64}/" koncrete.rb
-          sed -i "s/2cc2012c6cb8d012b5e3c02614076314d81e9816be3a80dbdfffe7cce8ceae3e/${linux_x64}/" koncrete.rb
-          sed -i "s/<linux-arm64-sha256>/${linux_arm64}/" koncrete.rb
+          sed -i "s/126eef9ebe9865476128abb810d714dbc2575e9ac46dd27d4cb47219a9c7df60/${OSX_X64}/" koncrete.rb
+          sed -i "s/40e682ee0a9564dbebbfac4cdc629a540b6c806e63f6f127e902ae562982ea31/${OSX_ARM64}/" koncrete.rb
+          sed -i "s/2cc2012c6cb8d012b5e3c02614076314d81e9816be3a80dbdfffe7cce8ceae3e/${LINUX_X64}/" koncrete.rb
+          sed -i "s/<linux-arm64-sha256>/${LINUX_ARM64}/" koncrete.rb
 
-      - name: Commit and push
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add koncrete.rb
-          git commit -m "Update Koncrete to $LATEST"
+          git diff --cached --quiet || git commit -m "Update Koncrete to $LATEST"
           git push
