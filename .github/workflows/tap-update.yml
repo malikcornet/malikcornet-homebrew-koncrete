@@ -20,8 +20,10 @@ jobs:
       - name: Get latest release
         id: release
         run: |
-          LATEST=$(curl -s https://api.github.com/repos/yourusername/Koncrete/releases/latest | jq -r '.tag_name')
+          LATEST=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/malikcornet/Koncrete/releases/latest | jq -r '.tag_name')
           echo "LATEST=$LATEST" >> $GITHUB_ENV
+          echo "Latest release: $LATEST"
 
       - name: Compute SHA256 for all targets
         id: sha
@@ -47,6 +49,7 @@ jobs:
           sed -i "s/40e682ee0a9564dbebbfac4cdc629a540b6c806e63f6f127e902ae562982ea31/${OSX_ARM64}/" koncrete.rb
           sed -i "s/2cc2012c6cb8d012b5e3c02614076314d81e9816be3a80dbdfffe7cce8ceae3e/${LINUX_X64}/" koncrete.rb
           sed -i "s/<linux-arm64-sha256>/${LINUX_ARM64}/" koncrete.rb
+
 
       - name: Commit and push changes
         run: |
