@@ -58,4 +58,3 @@ jobs:
           git add koncrete.rb
           git diff --cached --quiet || git commit -m "Update Koncrete to $LATEST"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/malikcornet/malikcornet-homebrew-koncrete.git HEAD:main
-      
