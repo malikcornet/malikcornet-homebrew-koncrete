@@ -15,13 +15,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl jq xz-utils git
+          sudo apt-get install -y curl jq xz-utils git gh
 
       - name: Get latest release
         id: release
         run: |
-          LATEST=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/malikcornet/Koncrete/releases/latest | jq -r '.tag_name')
+          LATEST=$(curl -s https://api.github.com/repos/malikcornet/Koncrete/releases/latest | jq -r '.tag_name')
           echo "LATEST=$LATEST" >> $GITHUB_ENV
           echo "Latest release: $LATEST"
 
@@ -36,7 +35,6 @@ jobs:
             curl -L -o "$FILE" "$URL"
             SHAS[$T]=$(sha256sum "$FILE" | awk '{print $1}')
           done
-          # Export as GitHub env
           echo "OSX_X64=${SHAS[osx-x64]}" >> $GITHUB_ENV
           echo "OSX_ARM64=${SHAS[osx-arm64]}" >> $GITHUB_ENV
           echo "LINUX_X64=${SHAS[linux-x64]}" >> $GITHUB_ENV
@@ -50,11 +48,20 @@ jobs:
           sed -i "s/2cc2012c6cb8d012b5e3c02614076314d81e9816be3a80dbdfffe7cce8ceae3e/${LINUX_X64}/" koncrete.rb
           sed -i "s/<linux-arm64-sha256>/${LINUX_ARM64}/" koncrete.rb
 
-
-      - name: Commit and push changes
+      - name: Commit and push to new branch
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+          BRANCH="update-koncrete-$LATEST"
+          git checkout -b $BRANCH
           git add koncrete.rb
           git diff --cached --quiet || git commit -m "Update Koncrete to $LATEST"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/malikcornet/malikcornet-homebrew-koncrete.git HEAD:main
+          git push origin $BRANCH
+
+      - name: Create Pull Request
+        run: |
+          gh auth setup-git
+          gh pr create --title "Update Koncrete to $LATEST" \
+                       --body "Automated update of Koncrete formula to $LATEST" \
+                       --base main \
+                       --head $BRANCH
